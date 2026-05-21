@@ -1,134 +1,145 @@
 <template>
   <v-app>
-    <v-container class="app-container">
-      <!-- ✅ Header -->
+    <v-container class="app-container rounded-lg">
+      <!-- 🎮 HEADER -->
       <div class="header">
-        <h1>📋 Todo</h1>
-
-        <v-select
-          v-model="selectedAccount"
-          :items="accounts"
-          variant="outlined"
-          density="compact"
-          hide-details
-          class="account-select"
-        />
+        <h1>QUEST LIST</h1>
       </div>
-      <!-- ✅ 新增任務（像 Notion） -->
-      <v-card class="add-card" elevation="2">
-        <v-row dense>
-          <!-- 手機會自動換行 -->
-          <v-col cols="12" sm="3">
-            <v-select
-              v-model="newTask.account"
-              :items="accountsNoAll"
-              label="Account"
-              variant="outlined"
-              density="compact"
-            />
-          </v-col>
 
-          <v-col cols="12" sm="3">
-            <v-select
-              v-model="newTask.type"
-              :items="types"
-              label="Type"
-              variant="outlined"
-              density="compact"
-            />
-          </v-col>
+      <!-- 🎮 新增任務 -->
+      <div class="quest-input">
+        <!-- ✅ 第一列 -->
+        <div class="input-row-top">
+          <v-select
+            v-model="selectedAccount"
+            :items="accounts"
+            label="Show"
+            density="compact"
+            hide-details
+            class="account-select"
+          />
+          <v-select
+            v-model="newQuest.account"
+            :items="accountsNoAll"
+            label="Account"
+            density="compact"
+            class="input-select"
+            hide-details
+          />
 
-          <v-col cols="12" sm="6">
-            <v-btn class="pixel-btn" block @click="handleAdd">
-              ➕ NEW TASK
-            </v-btn>
-          </v-col>
-        </v-row>
-        <v-textarea
-          v-model="newTask.task"
-          label="新增任務..."
-          variant="outlined"
-          density="comfortable"
-          @keyup.enter="handleAdd"
-        ></v-textarea>
-      </v-card>
+          <v-select
+            v-model="newQuest.type"
+            :items="types"
+            label="Type"
+            density="compact"
+            class="input-select"
+            hide-details
+          />
+        </div>
 
-      <!-- ✅ 任務清單 -->
-      <div class="task-list">
+        <!-- ✅ 第二列 -->
+        <div class="input-row-bottom">
+          <!-- ✅ 按鈕 -->
+          <v-btn class="pixel-btn" @click="handleAdd"> NEW QUEST </v-btn>
+
+          <!-- ✅ textarea -->
+          <v-textarea
+            v-model="newQuest.task"
+            label="QUEST"
+            rows="1"
+            auto-grow
+            class="quest-textarea"
+          />
+        </div>
+      </div>
+
+      <!-- 🎮 任務列表 -->
+      <div class="quest-list">
+        <div class="quest-title">QUEST LOG</div>
+
         <v-fade-transition group>
-          <v-card
+          <div
             v-for="task in filteredTasks"
             :key="task._index"
-            class="task-card"
-            elevation="2"
+            class="quest-card"
+            :style="{
+              '--card-bg': getColor(task.type),
+            }"
           >
-            <div class="task-row">
+            <div class="quest-row">
               <!-- checkbox -->
-              <v-checkbox
+              <input
+                type="checkbox"
                 v-model="task.done"
-                density="comfortable"
                 @change="toggleDone(task)"
+                class="pixel-checkbox"
               />
 
-              <!-- 內容 -->
-              <div class="task-content">
-                <div class="task-meta">
+              <!-- ✅ 任務內容（正常字體） -->
+              <div class="quest-content">
+                <div class="quest-main" :class="{ done: task.done }">
+                  {{ task.task }}
+                </div>
+
+                <div class="quest-sub pixel-font">
+                  <!-- ✅ type badge -->
                   <v-chip
                     size="small"
-                    :color="typeColor(task.type)"
-                    class="mr-2"
+                    class="type-chip pixel-font"
+                    :style="{
+                      borderColor: getTypeStyle(task.type),
+                      'background-color': getTypeStyle(task.type),
+                    }"
                   >
                     {{ task.type }}
                   </v-chip>
 
-                  <span class="date">
+                  <!-- ✅ 日期 -->
+                  <span class="quest-date pixel-font">
                     {{ formatDate(task.date) }}
                   </span>
                 </div>
-                <div class="task-title" :class="{ done: task.done }">
-                  {{ task.task }}
-                </div>
               </div>
 
-              <!-- 刪除 -->
-              <v-btn
-                icon="mdi-delete"
-                variant="text"
+              <!-- ✅ 刪除（最右＋置中） -->
+              <button
+                class="pixel-btn small delete-btn"
                 @click="confirmDelete(task)"
-              />
+              >
+                X
+              </button>
             </div>
-          </v-card>
+          </div>
         </v-fade-transition>
       </div>
 
-      <v-dialog v-model="dialog" width="300">
+      <!-- ✅ Dialog -->
+      <v-dialog v-model="dialog" class="pixel-font" width="300">
         <v-card>
-          <v-card-title>確認刪除?</v-card-title>
-
+          <v-card-title>DELETE TASK?</v-card-title>
           <v-card-actions>
             <v-spacer />
-
-            <v-btn variant="text" @click="dialog = false"> 取消 </v-btn>
-
-            <v-btn color="red" @click="removeTask"> 刪除 </v-btn>
+            <v-btn @click="dialog = false">CANCEL</v-btn>
+            <v-btn color="red" @click="removeTask">DELETE</v-btn>
           </v-card-actions>
         </v-card>
       </v-dialog>
 
-      <!-- Snackbar -->
-      <v-snackbar v-model="snackbar">
+      <!-- ✅ Snackbar -->
+      <v-snackbar v-model="snackbar" class="pixel-font">
         {{ message }}
       </v-snackbar>
     </v-container>
   </v-app>
 </template>
+
 <script setup>
 import { ref, computed, onMounted } from "vue";
 import { useTasksApi } from "@/composables/useTasksApi";
 import { debounce } from "lodash-es";
-
 import { useHead } from "#imports";
 
+/* ✅ 載入像素字體 */
 useHead({
   link: [
     {
@@ -138,16 +149,9 @@ useHead({
   ],
 });
 
-// ✅ 每個 task 各自 debounce（避免互相影響）
-const debounceMap = {};
-
-// ✅ 勾選切換（✔ 最終版）
-
 const { fetchTasks, addTask, updateTask, deleteTask } = useTasksApi();
 
 const tasks = ref([]);
-const loading = ref(false);
-
 const snackbar = ref(false);
 const message = ref("");
 const dialog = ref(false);
@@ -157,7 +161,7 @@ const selectedAccount = ref("All");
 
 const types = ["工作", "家庭", "個人"];
 
-const newTask = ref({
+const newQuest = ref({
   account: "",
   type: "",
   task: "",
@@ -165,7 +169,27 @@ const newTask = ref({
   date: "",
 });
 
-// ✅ 自動產生 account
+const getColor = (type) => {
+  return (
+    {
+      工作: "#424242",
+      家庭: "#00695c",
+      個人: "#37474f",
+    }[type] || "#2a2a2a"
+  );
+};
+
+const getTypeStyle = (type) => {
+  return {
+    工作: "#212121",
+    家庭: "#004D40",
+    個人: "#263238",
+  }[type];
+};
+
+/* ✅ debounce */
+const debounceMap = {};
+
 const accounts = computed(() => {
   const set = new Set(tasks.value.map((t) => t.account));
   return ["All", ...set];
@@ -173,70 +197,53 @@ const accounts = computed(() => {
 
 const accountsNoAll = computed(() => accounts.value.filter((a) => a !== "All"));
 
-// ✅ 篩選
 const filteredTasks = computed(() => {
   if (selectedAccount.value === "All") return tasks.value;
   return tasks.value.filter((t) => t.account === selectedAccount.value);
 });
 
-// ✅ 載入
 const loadData = async () => {
-  loading.value = true;
-
   const { rows } = await fetchTasks();
-
   tasks.value = rows.map((row) => ({
     ...row,
     done: row.done === "1" || row.done === 1,
   }));
-
-  loading.value = false;
 };
 
-// ✅ 新增
 const handleAdd = async () => {
-  newTask.value.date = new Date().toISOString();
+  newQuest.value.date = new Date().toISOString();
 
-  await addTask(newTask.value);
+  await addTask(newQuest.value);
 
-  showMsg("新增成功 ✅");
+  showMsg("New Quest created. ✅");
 
-  newTask.value = { account: "", type: "", task: "", done: "0", date: "" };
+  newQuest.value = { account: "", type: "", task: "", done: "0", date: "" };
 
   loadData();
 };
 
-// ✅ done
 const toggleDone = (task) => {
   const key = task._index;
 
-  if (debounceMap[key]) {
-    debounceMap[key].cancel();
-  }
+  if (debounceMap[key]) debounceMap[key].cancel();
 
   debounceMap[key] = debounce(async () => {
     try {
       const { _index, ...data } = task;
-
       data.done = task.done ? "1" : "0";
 
       await updateTask(_index, data);
 
-      showMsg("已更新 ✅");
-    } catch (err) {
-      console.error(err);
-
-      // rollback（失敗還原）
+      showMsg("Quest list updated.");
+    } catch {
       task.done = !task.done;
-
-      showMsg("更新失敗 ❌");
+      showMsg("Quest list update failed...");
     }
   }, 500);
 
   debounceMap[key]();
 };
 
-// ✅ 刪除
 const confirmDelete = (task) => {
   deleteTarget.value = task;
   dialog.value = true;
@@ -245,37 +252,17 @@ const confirmDelete = (task) => {
 const removeTask = async () => {
   const target = deleteTarget.value;
 
-  // ✅ UI先移除（樂觀）
   tasks.value = tasks.value.filter((t) => t._index !== target._index);
-
   dialog.value = false;
 
-  try {
-    await deleteTask(target._index);
+  await deleteTask(target._index);
 
-    showMsg("已刪除 ✅");
-  } catch (err) {
-    showMsg("刪除失敗 ❌");
-
-    // ❗ rollback（失敗還原）
-    loadData();
-  }
+  showMsg("Task deleted.");
 };
 
-// ✅ UI helpers
 const showMsg = (msg) => {
   message.value = msg;
   snackbar.value = true;
-};
-
-const typeColor = (type) => {
-  return (
-    {
-      工作: "blue",
-      家庭: "green",
-      個人: "orange",
-    }[type] || "grey"
-  );
 };
 
 const formatDate = (date) => {
@@ -285,116 +272,193 @@ const formatDate = (date) => {
 
 onMounted(loadData);
 </script>
+
 <style scoped>
+/* ✅ 背景 */
 .app-container {
   max-width: 700px;
   margin: auto;
-  padding: 16px;
+  background: #111;
+  color: #fff;
+  padding: 16px 24px 16px 24px;
+  font-family: "Press Start 2P", monospace;
+  --pixel-checkbox-size: 24px;
+}
+
+.pixel-font,
+.pixel-font * {
+  font-family: "Press Start 2P", monospace !important;
 }
 
 /* header */
 .header {
   display: flex;
   justify-content: space-between;
-  align-items: center;
   margin-bottom: 16px;
 }
 
-.account-select {
-  width: 140px;
+/* ✅ quest 卡片標題 */
+.app-title {
+  color: #00ff00;
+  font-size: 12px;
+  margin-bottom: 12px;
 }
 
-/* 新增卡片 */
-.add-card {
-  padding: 16px;
-  margin-bottom: 24px;
-  border-radius: 12px;
-}
-
-/* 任務 */
-.task-list {
+.input-row-top {
   display: flex;
-  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+/* ✅ select 不撐滿 */
+.input-select {
+  width: auto;
+  min-width: 120px;
+}
+
+.input-row-bottom {
+  display: flex;
+  align-items: flex-start;
   gap: 12px;
 }
 
-.task-card {
-  border-radius: 12px;
-  padding: 12px 16px;
-}
-
-/* row */
-.task-row {
-  display: flex;
-  align-items: center;
-}
-
-/* 內容 */
-.task-content {
+/* ✅ textarea 吃剩餘空間 */
+.quest-textarea {
   flex: 1;
 }
 
-/* 標題 */
-.task-title {
-  font-size: 16px;
+/* ✅ 卡片底色 👉 可以在這改（目前已調亮） */
+.quest-card {
+  background: var(--card-bg); /* ⭐改這裡可以調亮/暗 */
+  border: 3px solid #000;
+  padding: 10px;
+  box-shadow: 4px 4px 0 #000;
+  color: white;
 }
 
-.task-title.done {
-  text-decoration: line-through;
-  opacity: 0.5;
-}
-
-/* meta */
-.task-meta {
-  font-size: 12px;
-  color: gray;
+/* ✅ quest-sub layout */
+.quest-sub {
+  display: flex;
+  align-items: center;
+  gap: 10px;
   margin-top: 4px;
 }
 
-.date {
-  margin-left: 4px;
+/* ✅ type chip 外觀 */
+.type-chip {
+  font-size: 12px !important;
+  height: 24px !important;
+
+  /* background: #253042; */
+  color: white;
+
+  border: 2px solid #00ff00;
 }
+
+/* ✅ 日期 */
+.quest-date {
+  font-size: 12px;
+  color: #aaa;
+}
+
+/* ✅ 工作 */
+.type-work {
+  background: #455a64; /* grey-darken-2 */
+}
+
+/* ✅ 家庭 */
+.type-home {
+  background: #388e3c; /* teal-darken-2 */
+}
+
+/* ✅ 個人 */
+.type-personal {
+  background: #00796b; /* blue-grey-darken-2 */
+}
+
+/* row */
+.quest-row {
+  display: flex;
+  align-items: center;
+  gap: 12px; /* ✅ 你要求 */
+}
+
+/* ✅ 任務內容字體（非pixel） */
+.quest-content,
+.quest-main {
+  font-family: "Microsoft YaHei", Arial, sans-serif;
+}
+
+.quest-content {
+  flex: 1;
+}
+
+.quest-main.done {
+  text-decoration: line-through;
+  color: #888;
+}
+
+.quest-sub {
+  font-size: 12px;
+  color: #bbb;
+}
+
+/* checkbox */
+.pixel-checkbox {
+  width: var(--pixel-checkbox-size);
+  height: var(--pixel-checkbox-size);
+  appearance: none;
+  border: 3px solid black;
+  background: #222;
+}
+
+.pixel-checkbox:checked {
+  background: #00ff00;
+}
+
+/* ✅ 按鈕 */
 .pixel-btn {
   font-family: "Press Start 2P", monospace;
   font-size: 12px;
+
   background: #2ecc00;
   color: white;
+
   border: 4px solid black;
-  border-radius: 6px;
-  box-shadow: inset -4px -4px 0 #1a9900;
-  padding: 14px;
-  transition: all 0.1s ease;
+  box-shadow: inset -3px -3px 0 #1a9900;
+
+  padding: 20px 10px; /* ⭐高度變2倍 + 橫向 padding */
+  width: auto; /* ✅ 寬度自適應內容 */
 }
 
-/* hover */
-.pixel-btn:hover {
-  background: #36ff00;
-  transform: translateY(-1px);
+/* ✅ 小按鈕（刪除） */
+.pixel-btn.small {
+  padding: 6px 10px;
+  font-size: 10px;
 }
 
-/* 按下效果（像遊戲按鈕） */
-.pixel-btn:active {
-  transform: translateY(2px);
-  box-shadow: inset 4px 4px 0 #1a9900;
+/* ✅ 刪除按鈕位置（最右 + 垂直置中） */
+.delete-btn {
+  margin-left: auto;
+  align-self: center;
 }
-/* 📱 手機優化 */
+
+/* ✅ 下拉選單字體 */
+.v-select,
+.v-field,
+.v-field__input {
+  font-family: "Microsoft YaHei", Arial, sans-serif !important;
+}
+
+/* textarea */
+textarea {
+  font-family: "Microsoft YaHei", Arial, sans-serif;
+}
+
+/* 手機版 */
 @media (max-width: 600px) {
-  .header {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 8px;
-  }
-
-  .account-select {
-    width: 100%;
-  }
-
-  .task-row {
-    align-items: flex-start;
-  }
-
-  .task-content {
-    margin-left: 8px;
+  .app-container {
+    padding: 12px;
   }
 }
 </style>
