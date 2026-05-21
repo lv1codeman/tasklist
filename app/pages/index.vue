@@ -1,376 +1,400 @@
 <template>
-  <div class="page">
-    <div class="container">
-      <div class="text-h6 text-center">異環每日/每週</div>
-      <!-- ✅ 進度 -->
-      <v-card class="mb-3 pa-3 rounded-xl py-5">
-        <div class="d-flex justify-space-between">
-          <span style="font-size: 18px">完成度</span>
-          <span>{{ progress }}%</span>
-        </div>
-        <v-progress-linear
-          :model-value="progress"
-          height="15"
-          color="deep-purple"
+  <v-app>
+    <v-container class="app-container">
+      <!-- ✅ Header -->
+      <div class="header">
+        <h1>📋 Todo</h1>
+
+        <v-select
+          v-model="selectedAccount"
+          :items="accounts"
+          variant="outlined"
+          density="compact"
+          hide-details
+          class="account-select"
         />
+      </div>
+      <!-- ✅ 新增任務（像 Notion） -->
+      <v-card class="add-card" elevation="2">
+        <v-row dense>
+          <!-- 手機會自動換行 -->
+          <v-col cols="12" sm="3">
+            <v-select
+              v-model="newTask.account"
+              :items="accountsNoAll"
+              label="Account"
+              variant="outlined"
+              density="compact"
+            />
+          </v-col>
+
+          <v-col cols="12" sm="3">
+            <v-select
+              v-model="newTask.type"
+              :items="types"
+              label="Type"
+              variant="outlined"
+              density="compact"
+            />
+          </v-col>
+
+          <v-col cols="12" sm="6">
+            <v-btn class="pixel-btn" block @click="handleAdd">
+              ➕ NEW TASK
+            </v-btn>
+          </v-col>
+        </v-row>
+        <v-textarea
+          v-model="newTask.task"
+          label="新增任務..."
+          variant="outlined"
+          density="comfortable"
+          @keyup.enter="handleAdd"
+        ></v-textarea>
       </v-card>
 
-      <v-row class="mb-3">
-        <v-col cols="6">
-          <v-btn block color="success" @click="completeAll"> 全部完成 </v-btn>
-        </v-col>
-
-        <v-col cols="6">
-          <v-btn block color="grey" @click="resetAll"> 全部未完成 </v-btn>
-        </v-col>
-      </v-row>
-
-      <!-- ✅ Tabs -->
-      <v-tabs v-model="tab" grow show-arrows>
-        <v-tab v-for="c in categories" :key="c" :value="c" class="tab-wrapper">
-          <!-- ✅ tab文字 -->
-          <span>{{ c }}</span>
-
-          <v-badge
-            v-if="getUnfinishedCount(c) > 0"
-            :content="getUnfinishedCount(c)"
-            color="red"
-            location="top end"
-            :offset-x="isMobile ? -12 : -15"
-            :offset-y="isMobile ? -5 : -2"
+      <!-- ✅ 任務清單 -->
+      <div class="task-list">
+        <v-fade-transition group>
+          <v-card
+            v-for="task in filteredTasks"
+            :key="task._index"
+            class="task-card"
+            elevation="2"
           >
-          </v-badge>
-        </v-tab>
-      </v-tabs>
+            <div class="task-row">
+              <!-- checkbox -->
+              <v-checkbox
+                v-model="task.done"
+                density="comfortable"
+                @change="toggleDone(task)"
+              />
 
-      <!-- ✅ 任務 -->
-      <v-window v-model="tab" touch>
-        <v-window-item v-for="c in categories" :key="c" :value="c">
-          <v-row class="mt-2">
-            <TransitionGroup tag="div" class="task-list w-100" name="move">
-              <v-col
-                v-for="item in filteredTasks(c)"
-                :key="item.name"
-                cols="12"
-                class="mt-2"
-              >
-                <v-card
-                  class="task-card"
-                  :class="[getColor(item.type), { done: item.done }]"
-                  @click="toggleDone(item)"
-                >
-                  <!-- ✅ 左：目標 -->
-                  <div class="left">
-                    {{ item.name }}
-                  </div>
+              <!-- 內容 -->
+              <div class="task-content">
+                <div class="task-meta">
+                  <v-chip
+                    size="small"
+                    :color="typeColor(task.type)"
+                    class="mr-2"
+                  >
+                    {{ task.type }}
+                  </v-chip>
 
-                  <!-- ✅ 中：膠囊 -->
-                  <div class="middle">
-                    <div class="pill">
-                      {{ item.freq }}
-                    </div>
-                  </div>
+                  <span class="date">
+                    {{ formatDate(task.date) }}
+                  </span>
+                </div>
+                <div class="task-title" :class="{ done: task.done }">
+                  {{ task.task }}
+                </div>
+              </div>
 
-                  <!-- ✅ 右：備註 -->
-                  <div class="right">
-                    {{ item.desc }}
-                  </div>
+              <!-- 刪除 -->
+              <v-btn
+                icon="mdi-delete"
+                variant="text"
+                @click="confirmDelete(task)"
+              />
+            </div>
+          </v-card>
+        </v-fade-transition>
+      </div>
 
-                  <!-- ✅ 右上 icon -->
-                  <v-icon class="status-icon">
-                    {{ item.done ? "mdi-check-circle" : "mdi-circle-outline" }}
-                  </v-icon>
-                </v-card>
-              </v-col>
-            </TransitionGroup>
-          </v-row>
-        </v-window-item>
-      </v-window>
-    </div>
-  </div>
+      <v-dialog v-model="dialog" width="300">
+        <v-card>
+          <v-card-title>確認刪除?</v-card-title>
+
+          <v-card-actions>
+            <v-spacer />
+
+            <v-btn variant="text" @click="dialog = false"> 取消 </v-btn>
+
+            <v-btn color="red" @click="removeTask"> 刪除 </v-btn>
+          </v-card-actions>
+        </v-card>
+      </v-dialog>
+
+      <!-- Snackbar -->
+      <v-snackbar v-model="snackbar">
+        {{ message }}
+      </v-snackbar>
+    </v-container>
+  </v-app>
 </template>
-
 <script setup>
-import { ref, computed } from "vue";
-import { useDisplay } from "vuetify";
+import { ref, computed, onMounted } from "vue";
+import { useTasksApi } from "@/composables/useTasksApi";
+import { debounce } from "lodash-es";
 
-const { mobile } = useDisplay();
-const isMobile = computed(() => mobile.value);
+import { useHead } from "#imports";
 
-const categories = ["地圖資源", "好感度", "都市大亨", "自宅", "體力副本"];
-const tab = ref("地圖資源");
-
-const tasks = ref([
-  {
-    type: "地圖資源",
-    freq: "日",
-    name: "魔女之家",
-    desc: "諭石位置、逸聞位置、傷害buff",
-  },
-  {
-    type: "地圖資源",
-    freq: "日",
-    name: "搶路人(4公事包)",
-    desc: "機率出車鑰匙、錢包=1000方斯or脆薯餅一個(500甲蟲幣)",
-  },
-  {
-    type: "地圖資源",
-    freq: "日",
-    name: "許願池(S武器)",
-    desc: "驅動塊代幣、S級武器",
-  },
-  {
-    type: "地圖資源",
-    freq: "日",
-    name: "小吱",
-    desc: "40000方斯，重擊怪物，甲蟲副本選第一關慢慢丟",
-  },
-  {
-    type: "地圖資源",
-    freq: "日",
-    name: "小混混",
-    desc: "善良脆薯餅(警局換甲蟲幣1:500)，警局用地圖右上傳點最近",
-  },
-  { type: "地圖資源", freq: "週", name: "拍賣會", desc: "瑪門升級材料" },
-  { type: "地圖資源", freq: "週", name: "保險箱", desc: "13750方斯" },
-
-  {
-    type: "好感度",
-    freq: "日",
-    name: "送禮",
-    desc: "角色好感度(潯、小吱、娜娜莉、九原)",
-  },
-  {
-    type: "好感度",
-    freq: "日",
-    name: "看電影",
-    desc: "傳斑蝶、買票、電影可ALT+左上跳過",
-  },
-
-  { type: "都市大亨", freq: "雙週", name: "粉爪大劫案", desc: "方斯、粉爪幣" },
-  { type: "都市大亨", freq: "日", name: "一咖舍領收益", desc: "方斯" },
-  { type: "都市大亨", freq: "日", name: "同城派送", desc: "方斯" },
-
-  { type: "自宅", freq: "日", name: "木箱領甲蟲幣", desc: "甲蟲幣" },
-  { type: "自宅", freq: "日", name: "哈索爾領驅動塊", desc: "需要140W房子" },
-  { type: "自宅", freq: "日", name: "領雲朵(好感度)", desc: "雲朵" },
-  { type: "自宅", freq: "週", name: "貓咪瑪門", desc: "方斯" },
-
-  { type: "體力副本", freq: "週", name: "週本", desc: "F1第3頁第5項" },
-  { type: "體力副本", freq: "日", name: "各式材料", desc: "F1第三頁" },
-]);
-
-tasks.value.forEach((t) => {
-  t.done = false;
-  t.date = null;
+useHead({
+  link: [
+    {
+      href: "https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap",
+      rel: "stylesheet",
+    },
+  ],
 });
 
-const filteredTasks = (type) => {
-  return tasks.value
-    .filter((t) => t.type === type)
-    .sort((a, b) => a.done - b.done);
-};
+// ✅ 每個 task 各自 debounce（避免互相影響）
+const debounceMap = {};
 
-const progress = computed(() => {
-  const done = tasks.value.filter((t) => t.done).length;
-  return Math.round((done / tasks.value.length) * 100);
+// ✅ 勾選切換（✔ 最終版）
+
+const { fetchTasks, addTask, updateTask, deleteTask } = useTasksApi();
+
+const tasks = ref([]);
+const loading = ref(false);
+
+const snackbar = ref(false);
+const message = ref("");
+const dialog = ref(false);
+const deleteTarget = ref(null);
+
+const selectedAccount = ref("All");
+
+const types = ["工作", "家庭", "個人"];
+
+const newTask = ref({
+  account: "",
+  type: "",
+  task: "",
+  done: "0",
+  date: "",
 });
 
-const toggleDone = (item) => {
-  item.done = !item.done;
-  item.date = item.done ? new Date().toISOString() : null;
+// ✅ 自動產生 account
+const accounts = computed(() => {
+  const set = new Set(tasks.value.map((t) => t.account));
+  return ["All", ...set];
+});
+
+const accountsNoAll = computed(() => accounts.value.filter((a) => a !== "All"));
+
+// ✅ 篩選
+const filteredTasks = computed(() => {
+  if (selectedAccount.value === "All") return tasks.value;
+  return tasks.value.filter((t) => t.account === selectedAccount.value);
+});
+
+// ✅ 載入
+const loadData = async () => {
+  loading.value = true;
+
+  const { rows } = await fetchTasks();
+
+  tasks.value = rows.map((row) => ({
+    ...row,
+    done: row.done === "1" || row.done === 1,
+  }));
+
+  loading.value = false;
 };
 
-const completeAll = () => {
-  tasks.value.forEach((t) => {
-    if (t.type === tab.value) {
-      t.done = true;
-      t.date = new Date().toISOString();
+// ✅ 新增
+const handleAdd = async () => {
+  newTask.value.date = new Date().toISOString();
+
+  await addTask(newTask.value);
+
+  showMsg("新增成功 ✅");
+
+  newTask.value = { account: "", type: "", task: "", done: "0", date: "" };
+
+  loadData();
+};
+
+// ✅ done
+const toggleDone = (task) => {
+  const key = task._index;
+
+  if (debounceMap[key]) {
+    debounceMap[key].cancel();
+  }
+
+  debounceMap[key] = debounce(async () => {
+    try {
+      const { _index, ...data } = task;
+
+      data.done = task.done ? "1" : "0";
+
+      await updateTask(_index, data);
+
+      showMsg("已更新 ✅");
+    } catch (err) {
+      console.error(err);
+
+      // rollback（失敗還原）
+      task.done = !task.done;
+
+      showMsg("更新失敗 ❌");
     }
-  });
+  }, 500);
+
+  debounceMap[key]();
 };
 
-const resetAll = () => {
-  tasks.value.forEach((t) => {
-    if (t.type === tab.value) {
-      t.done = false;
-      t.date = null;
-    }
-  });
+// ✅ 刪除
+const confirmDelete = (task) => {
+  deleteTarget.value = task;
+  dialog.value = true;
 };
 
-const getUnfinishedCount = (type) => {
-  return tasks.value.filter((t) => t.type === type && !t.done).length;
+const removeTask = async () => {
+  const target = deleteTarget.value;
+
+  // ✅ UI先移除（樂觀）
+  tasks.value = tasks.value.filter((t) => t._index !== target._index);
+
+  dialog.value = false;
+
+  try {
+    await deleteTask(target._index);
+
+    showMsg("已刪除 ✅");
+  } catch (err) {
+    showMsg("刪除失敗 ❌");
+
+    // ❗ rollback（失敗還原）
+    loadData();
+  }
 };
 
-const getColor = (type) =>
-  ({
-    地圖資源: "bg-map",
-    好感度: "bg-love",
-    都市大亨: "bg-city",
-    自宅: "bg-home",
-    體力副本: "bg-dungeon",
-  }[type]);
+// ✅ UI helpers
+const showMsg = (msg) => {
+  message.value = msg;
+  snackbar.value = true;
+};
+
+const typeColor = (type) => {
+  return (
+    {
+      工作: "blue",
+      家庭: "green",
+      個人: "orange",
+    }[type] || "grey"
+  );
+};
+
+const formatDate = (date) => {
+  if (!date) return "";
+  return new Date(date).toLocaleDateString();
+};
+
+onMounted(loadData);
 </script>
-
 <style scoped>
-@media (max-width: 768px) {
-  .container {
+.app-container {
+  max-width: 700px;
+  margin: auto;
+  padding: 16px;
+}
+
+/* header */
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.account-select {
+  width: 140px;
+}
+
+/* 新增卡片 */
+.add-card {
+  padding: 16px;
+  margin-bottom: 24px;
+  border-radius: 12px;
+}
+
+/* 任務 */
+.task-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.task-card {
+  border-radius: 12px;
+  padding: 12px 16px;
+}
+
+/* row */
+.task-row {
+  display: flex;
+  align-items: center;
+}
+
+/* 內容 */
+.task-content {
+  flex: 1;
+}
+
+/* 標題 */
+.task-title {
+  font-size: 16px;
+}
+
+.task-title.done {
+  text-decoration: line-through;
+  opacity: 0.5;
+}
+
+/* meta */
+.task-meta {
+  font-size: 12px;
+  color: gray;
+  margin-top: 4px;
+}
+
+.date {
+  margin-left: 4px;
+}
+.pixel-btn {
+  font-family: "Press Start 2P", monospace;
+  font-size: 12px;
+  background: #2ecc00;
+  color: white;
+  border: 4px solid black;
+  border-radius: 6px;
+  box-shadow: inset -4px -4px 0 #1a9900;
+  padding: 14px;
+  transition: all 0.1s ease;
+}
+
+/* hover */
+.pixel-btn:hover {
+  background: #36ff00;
+  transform: translateY(-1px);
+}
+
+/* 按下效果（像遊戲按鈕） */
+.pixel-btn:active {
+  transform: translateY(2px);
+  box-shadow: inset 4px 4px 0 #1a9900;
+}
+/* 📱 手機優化 */
+@media (max-width: 600px) {
+  .header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .account-select {
     width: 100%;
   }
-  .task-card > .left {
-    width: 20%;
-    font-size: 16px;
+
+  .task-row {
+    align-items: flex-start;
   }
-  .task-card > .middle {
-    width: 20%;
+
+  .task-content {
+    margin-left: 8px;
   }
-  .task-card > .right {
-    width: 60%;
-    font-size: 14px;
-  }
-  .task-card > .middle > .pill {
-    border-radius: 999px;
-    background: #333;
-    color: white;
-  }
-}
-
-/* ✅ 整頁 */
-.page {
-  height: 100vh;
-  background: #f5f5f5;
-  display: flex;
-  justify-content: center;
-}
-
-/* ✅ container */
-.container {
-  width: 800px;
-  height: 100%;
-  overflow-y: auto;
-  padding: 10px;
-  overflow-x: hidden;
-  /* overflow-y: hidden; */
-  -webkit-overflow-scrolling: touch;
-  padding-bottom: 50px;
-}
-
-.container::-webkit-scrollbar {
-  display: none;
-}
-
-/* ✅ 卡片 layout */
-.task-card {
-  height: 100px;
-  display: flex;
-  align-items: center;
-  position: relative;
-  padding: 10px;
-  border-radius: 12px;
-  cursor: pointer;
-}
-
-/* ✅ 左30% */
-.left {
-  width: 20%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  text-align: center;
-  word-break: break-word;
-  font-size: 18px;
-}
-
-/* ✅ 中10% */
-.middle {
-  width: 10%;
-  display: flex;
-  justify-content: center;
-}
-
-/* ✅ 右60% */
-.right {
-  width: 60%;
-  display: flex;
-  align-items: center;
-  word-break: break-word;
-}
-
-/* ✅ 膠囊（你指定） */
-.pill {
-  font-size: 14px;
-  padding: 5px 15px;
-  border-radius: 999px;
-  background: #333;
-  color: white;
-}
-
-/* ✅ icon */
-.status-icon {
-  position: absolute;
-  top: 6px;
-  right: 6px;
-}
-
-/* ✅ 完成 */
-.done {
-  background: #e0e0e0 !important;
-  opacity: 0.6;
-  transform: scale(0.98);
-}
-
-/* ✅ 顏色 */
-.bg-map {
-  background: #d1c4e9;
-}
-.bg-love {
-  background: #f8bbd0;
-}
-.bg-city {
-  background: #ffe0b2;
-}
-.bg-home {
-  background: #c8e6c9;
-}
-.bg-dungeon {
-  background: #bbdefb;
-}
-
-/* ✅ 動畫核心 */
-.move-move {
-  transition: transform 0.5s ease;
-}
-
-/* ✅ 新增 */
-.move-enter-active,
-.move-leave-active {
-  transition: all 1s ease;
-}
-
-.move-enter-from,
-.move-leave-to {
-  opacity: 0;
-  transform: translateY(20px);
-}
-.tab-label {
-  display: flex;
-  align-items: center;
-  font-size: 14px;
-  line-height: 20px;
-}
-
-.tab-wrapper {
-  position: relative;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-}
-
-/* ✅ badge 固定右上角 */
-.tab-badge {
-  position: absolute;
-  top: 16px;
-  right: 30px;
 }
 </style>
