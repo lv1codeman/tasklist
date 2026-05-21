@@ -2,55 +2,61 @@ export const useTasksApi = () => {
   const API_URL =
     "https://script.google.com/macros/s/AKfycbz0x7NwLAIPIq2Wl-WcrYVNGhP1MD6VIJID0XAdg3EGDZNYmQIQevXQR2m6EXU9TsZYdA/exec";
 
-  // ✅ 讀取
+  /* ✅ GET（不用改） */
   const fetchTasks = async () => {
     const res = await fetch(API_URL);
     const data = await res.json();
 
-    const headers = data[0];
-
-    const rows = data.slice(1).map((row, i) => {
-      const obj = { _index: i + 2 }; // 對應 sheet row
-      headers.forEach((key, index) => {
-        obj[key] = row[index];
-      });
-      return obj;
-    });
-
-    return { headers, rows };
+    // ✅ 你現在 GAS 是 object 格式
+    return {
+      headers: data.headers,
+      rows: data.rows,
+    };
   };
 
-  // ✅ 新增
+  /* ✅ ✅ 共用：form POST */
+  const post = async (payloadObj) => {
+    await fetch(API_URL, {
+      method: "POST",
+      mode: "no-cors",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      body: new URLSearchParams({
+        payload: JSON.stringify(payloadObj),
+      }),
+    });
+  };
+
+  /* ✅ 新增 */
   const addTask = async (taskObj) => {
-    await fetch(API_URL, {
-      method: "POST",
-      body: JSON.stringify({
-        action: "add",
-        data: taskObj,
-      }),
+    await post({
+      action: "add",
+      data: taskObj,
     });
   };
 
-  // ✅ 更新
-  const updateTask = async (rowIndex, updatedData) => {
-    await fetch(API_URL, {
-      method: "POST",
-      body: JSON.stringify({
-        action: "update",
-        index: rowIndex,
-        data: updatedData,
-      }),
+  /* ✅ 更新（✅改用 id） */
+  const updateTask = async (taskObj) => {
+    await post({
+      action: "update",
+      data: taskObj,
     });
   };
 
-  // ✅ 刪除
-  const deleteTask = async (rowIndex) => {
-    await fetch(API_URL, {
-      method: "POST",
-      body: JSON.stringify({
-        action: "delete",
-        index: rowIndex,
-      }),
+  /* ✅ 批次更新 */
+  const batchUpdateTasks = async (tasks) => {
+    await post({
+      action: "batchUpdate",
+      data: tasks,
+    });
+  };
+
+  /* ✅ 刪除（✅用 id） */
+  const deleteTask = async ({ id }) => {
+    await post({
+      action: "delete",
+      data: { id },
     });
   };
 
@@ -59,5 +65,6 @@ export const useTasksApi = () => {
     addTask,
     updateTask,
     deleteTask,
+    batchUpdateTasks,
   };
 };
