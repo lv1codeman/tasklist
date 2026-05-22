@@ -14,7 +14,6 @@
           v-model="selectedAccount"
           :items="accounts"
           label="Show"
-          density="compact"
           hide-details
         />
       </div>
@@ -270,12 +269,16 @@ const submitQuest = async () => {
     showMsg("請輸入任務 ❗");
     return;
   }
-
   if (!newQuest.value.account) {
     showMsg("請輸入 Account ❗");
     return;
   }
 
+  // ✅ ✅ ✅ 計算最大 order
+  const orders = tasks.value.map((t) => Number(t.order) || 0);
+  const maxOrder = orders.length ? Math.max(...orders) : -1;
+
+  // ✅ ✅ ✅ 新任務放最後
   const newItem = {
     id: Date.now().toString(),
     account: newQuest.value.account.trim(),
@@ -283,15 +286,11 @@ const submitQuest = async () => {
     task: newQuest.value.task.trim(),
     done: "0",
     date: new Date().toISOString(),
-    order: Date.now(),
+    order: maxOrder + 1, // ⭐⭐這行是關鍵⭐⭐
   };
-
   await addTask(newItem);
-
   dialogAdd.value = false;
-
   newQuest.value = { account: "", type: "", task: "" };
-
   await loadData();
 };
 
@@ -305,18 +304,22 @@ const handleCardClick = (task) => {
 /* ✅ 勾選 */
 const toggleDone = (task) => {
   if (task.done) {
-    task.order = Date.now();
+    // ✅ 找目前最大 order
+    const maxOrder = Math.max(...tasks.value.map((t) => t.order || 0));
+
+    task.order = maxOrder + 1;
   }
 
   const key = task.id;
-
-  if (debounceMap[key]) debounceMap[key].cancel();
-
+  if (debounceMap[key]) {
+    debounceMap[key].cancel();
+  }
   debounceMap[key] = debounce(async () => {
     try {
       await updateTask({
         ...task,
         done: task.done ? "1" : "0",
+        order: task.order,
       });
 
       showMsg("Updated ✅");
@@ -327,7 +330,7 @@ const toggleDone = (task) => {
     }
   }, 400);
 
-  debounceMap[key](); // ✅ 這行你原本漏掉
+  debounceMap[key]();
 };
 
 /* 刪除 */
