@@ -137,7 +137,7 @@
       <!-- DELETE -->
       <v-dialog v-model="dialog" width="300" class="pixel-font">
         <v-card>
-          <v-card-title>DELETE TASK?</v-card-title>
+          <v-card-title>DELETE QUEST?</v-card-title>
           <v-card-actions>
             <v-spacer />
             <v-btn @click="dialog = false">CANCEL</v-btn>
