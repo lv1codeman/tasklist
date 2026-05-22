@@ -202,10 +202,7 @@ const rebuildDisplayList = () => {
     list = list.filter((t) => t.account === selectedAccount.value);
   }
 
-  list.sort((a, b) => {
-    if (a.done !== b.done) return a.done ? 1 : -1;
-    return a.order - b.order;
-  });
+  list.sort((a, b) => a.order - b.order);
 
   displayList.value = list;
 };
@@ -286,7 +283,7 @@ const submitQuest = async () => {
     task: newQuest.value.task.trim(),
     done: "0",
     date: new Date().toISOString(),
-    order: maxOrder + 1, // ⭐⭐這行是關鍵⭐⭐
+    order: maxOrder + 1,
   };
   await addTask(newItem);
   dialogAdd.value = false;
@@ -303,13 +300,6 @@ const handleCardClick = (task) => {
 
 /* ✅ 勾選 */
 const toggleDone = (task) => {
-  if (task.done) {
-    // ✅ 找目前最大 order
-    const maxOrder = Math.max(...tasks.value.map((t) => t.order || 0));
-
-    task.order = maxOrder + 1;
-  }
-
   const key = task.id;
   if (debounceMap[key]) {
     debounceMap[key].cancel();
