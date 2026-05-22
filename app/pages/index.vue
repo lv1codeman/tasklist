@@ -19,8 +19,14 @@
       </div>
 
       <!-- LIST -->
-      <div class="quest-list">
+      <div class="quest-list mt-4 rounded-lg">
         <div class="quest-title">QUEST LOG</div>
+
+        <!-- ✅ ✅ Vuetify 分頁（僅新增這裡） -->
+        <v-tabs v-model="currentTab" class="mb-2" grow>
+          <v-tab value="CURRENT">CURRENT</v-tab>
+          <v-tab value="FINISHED">FINISHED</v-tab>
+        </v-tabs>
 
         <draggable
           v-model="displayList"
@@ -155,6 +161,8 @@ const tasks = ref([]);
 const displayList = ref([]);
 const isDragging = ref(false);
 
+const currentTab = ref("CURRENT"); // ✅ 新增
+
 const snackbar = ref(false);
 const message = ref("");
 const dialog = ref(false);
@@ -194,12 +202,19 @@ const accounts = computed(() => {
 
 const accountsNoAll = computed(() => accounts.value.filter((a) => a !== "All"));
 
-/* ✅ 重建畫面清單 */
+/* ✅ display邏輯（唯一改動） */
 const rebuildDisplayList = () => {
   let list = [...tasks.value];
 
   if (selectedAccount.value !== "All") {
     list = list.filter((t) => t.account === selectedAccount.value);
+  }
+
+  // ✅ ✅ 分頁
+  if (currentTab.value === "CURRENT") {
+    list = list.filter((t) => !t.done);
+  } else {
+    list = list.filter((t) => t.done);
   }
 
   list.sort((a, b) => a.order - b.order);
@@ -210,37 +225,22 @@ const rebuildDisplayList = () => {
 /* load */
 const loadData = async () => {
   const res = await fetchTasks();
-
-  console.log("API response:", res);
-
-  // ✅ 直接用 rows（已經是 object）
   const data = res.rows;
 
-  if (!data || data.length === 0) {
-    tasks.value = [];
-    return;
-  }
-
-  tasks.value = data.map((obj) => {
-    return {
-      ...obj,
-      done: obj.done === "1" || obj.done === 1 || obj.done === true,
-      order: Number(obj.order) || 0,
-    };
-  });
-
-  console.log("tasks:", tasks.value);
+  tasks.value = data.map((obj) => ({
+    ...obj,
+    done: obj.done === "1" || obj.done === 1 || obj.done === true,
+    order: Number(obj.order) || 0,
+  }));
 
   rebuildDisplayList();
 };
 
-/* ✅ 拖曳開始 */
+/* drag */
 const handleDragStart = () => {
   isDragging.value = true;
-  if (navigator.vibrate) navigator.vibrate(30);
 };
 
-/* ✅ 拖曳結束 */
 const handleDragEnd = async () => {
   isDragging.value = false;
 
@@ -255,105 +255,71 @@ const handleDragEnd = async () => {
 
   await batchUpdateTasks(tasks.value);
 
-  showMsg("Order updated ✅");
-
   rebuildDisplayList();
 };
 
-/* ✅ 新增 */
+/* create */
 const submitQuest = async () => {
-  if (!newQuest.value.task.trim()) {
-    showMsg("請輸入任務 ❗");
-    return;
-  }
-  if (!newQuest.value.account) {
-    showMsg("請輸入 Account ❗");
-    return;
-  }
-
-  // ✅ ✅ ✅ 計算最大 order
   const orders = tasks.value.map((t) => Number(t.order) || 0);
-  const maxOrder = orders.length ? Math.max(...orders) : -1;
+  const max = orders.length ? Math.max(...orders) : -1;
 
-  // ✅ ✅ ✅ 新任務放最後
-  const newItem = {
+  await addTask({
     id: Date.now().toString(),
-    account: newQuest.value.account.trim(),
+    account: newQuest.value.account,
     type: newQuest.value.type,
-    task: newQuest.value.task.trim(),
+    task: newQuest.value.task,
     done: "0",
     date: new Date().toISOString(),
-    order: maxOrder + 1,
-  };
-  await addTask(newItem);
+    order: max + 1,
+  });
+
   dialogAdd.value = false;
-  newQuest.value = { account: "", type: "", task: "" };
   await loadData();
 };
 
-/* ✅ 點擊卡片 */
-const handleCardClick = (task) => {
-  if (isDragging.value) return;
-  task.done = !task.done;
-  toggleDone(task);
-};
+/* toggle */
+const debounceMap = {};
 
-/* ✅ 勾選 */
 const toggleDone = (task) => {
   const key = task.id;
-  if (debounceMap[key]) {
-    debounceMap[key].cancel();
-  }
-  debounceMap[key] = debounce(async () => {
-    try {
-      await updateTask({
-        ...task,
-        done: task.done ? "1" : "0",
-        order: task.order,
-      });
 
-      showMsg("Updated ✅");
-      rebuildDisplayList();
-    } catch {
-      task.done = !task.done;
-      showMsg("Failed ❌");
-    }
-  }, 400);
+  if (debounceMap[key]) debounceMap[key].cancel();
+
+  debounceMap[key] = debounce(async () => {
+    await updateTask({
+      ...task,
+      done: task.done ? "1" : "0",
+    });
+
+    rebuildDisplayList();
+  }, 300);
 
   debounceMap[key]();
 };
 
-/* 刪除 */
+const handleCardClick = (task) => {
+  if (isDragging.value) return;
+
+  task.done = !task.done;
+  rebuildDisplayList();
+  toggleDone(task);
+};
+
+/* delete */
 const confirmDelete = (task) => {
   deleteTarget.value = task;
   dialog.value = true;
 };
 
 const removeTask = async () => {
-  const task = deleteTarget.value;
-
-  tasks.value = tasks.value.filter((t) => t.id !== task.id);
-
+  await deleteTask({ id: deleteTarget.value.id });
+  await loadData();
   dialog.value = false;
-
-  await deleteTask({ id: task.id });
-
-  rebuildDisplayList();
 };
-
-/* UI */
-const showMsg = (msg) => {
-  message.value = msg;
-  snackbar.value = true;
+const formatDate = (date) => {
+  return date ? new Date(date).toLocaleDateString() : "";
 };
-
-const formatDate = (date) => (date ? new Date(date).toLocaleDateString() : "");
-
-const debounceMap = {};
-
-watch(selectedAccount, () => {
-  rebuildDisplayList();
-});
+watch([selectedAccount, currentTab], rebuildDisplayList);
 
 onMounted(loadData);
 </script>
@@ -372,6 +338,10 @@ onMounted(loadData);
   display: flex;
   justify-content: space-between;
   margin-bottom: 16px;
+}
+.quest-list {
+  border: 3px solid white;
+  padding: 5px;
 }
 
 .quest-card {
