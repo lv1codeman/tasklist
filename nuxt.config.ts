@@ -7,7 +7,7 @@ export default defineNuxtConfig({
   ssr: false,
 
   app: {
-    baseURL: "/",
+    baseURL: import.meta.env.PROD ? "/tasklist/" : "/",
   },
 
   vuetify: {
