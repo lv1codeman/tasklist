@@ -416,4 +416,32 @@ onMounted(loadData);
   transform: translateY(-2px);
   box-shadow: 0 4px 12px rgba(255, 182, 193, 0.4);
 }
+
+/* ✅ 被拖起來的卡片（最重要🔥） */
+.sortable-chosen {
+  transform: scale(1.05) rotate(1deg);
+  box-shadow: 0 0 12px rgba(255, 105, 180, 0.7),
+    0 0 25px rgba(255, 182, 193, 0.9), 6px 6px 0 rgba(0, 0, 0, 0.2);
+
+  z-index: 10;
+  opacity: 1 !important;
+  /* background: #fff0f5 !important; */
+}
+
+/* ✅ 拖曳中的樣子 */
+.sortable-drag {
+  transform: scale(1.05);
+  z-index: 1000;
+}
+
+/* ✅ 留在原地的影子（弱化） */
+.sortable-ghost {
+  opacity: 0.2;
+  /* filter: blur(1px); */
+}
+
+.sortable-chosen,
+.sortable-drag {
+  cursor: grab !important;
+}
 </style>
