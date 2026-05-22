@@ -20,7 +20,17 @@
 
       <!-- LIST -->
       <div class="quest-list mt-4 rounded-lg">
-        <div class="quest-title">QUEST LOG</div>
+        <div class="quest-title-row">
+          <div>QUEST LOG</div>
+
+          <button
+            class="pixel-btn"
+            @click="deleteSelected"
+            v-if="selectedIds.size"
+          >
+            DELETE ({{ selectedIds.size }})
+          </button>
+        </div>
 
         <!-- ✅ ✅ Vuetify 分頁（僅新增這裡） -->
         <v-tabs v-model="currentTab" class="mb-2" grow>
@@ -31,6 +41,7 @@
         <draggable
           v-model="displayList"
           item-key="id"
+          handle=".quest-content-area"
           :delay="300"
           :delay-on-touch-only="true"
           @start="handleDragStart"
@@ -40,18 +51,20 @@
             <div
               class="quest-card"
               :style="{ '--card-bg': getColor(task.type) }"
-              @click="handleCardClick(task)"
             >
               <div class="quest-row">
-                <input
-                  type="checkbox"
-                  v-model="task.done"
-                  @click.stop
-                  @change="toggleDone(task)"
-                  class="pixel-checkbox"
-                />
-
-                <div class="quest-content">
+                <!-- ✅ checkbox 區 -->
+                <div class="checkbox-area">
+                  <input
+                    type="checkbox"
+                    :checked="selectedIds.has(task.id)"
+                    @click.stop
+                    @change="selectForDelete(task)"
+                    class="pixel-checkbox"
+                  />
+                </div>
+                <!-- ✅ ✅ 內容區（只有這裡會觸發） -->
+                <div class="quest-content-area" @click="handleCardClick(task)">
                   <div class="quest-main" :class="{ done: task.done }">
                     {{ task.task }}
                   </div>
@@ -74,12 +87,15 @@
                   </div>
                 </div>
 
-                <button
-                  class="pixel-btn small delete-btn"
-                  @click.stop="confirmDelete(task)"
-                >
-                  X
-                </button>
+                <!-- ✅ delete 區 -->
+                <div class="delete-area">
+                  <button
+                    class="pixel-btn small delete-btn"
+                    @click.stop="confirmDelete(task)"
+                  >
+                    X
+                  </button>
+                </div>
               </div>
             </div>
           </template>
@@ -170,6 +186,7 @@ const dialogAdd = ref(false);
 const deleteTarget = ref(null);
 
 const selectedAccount = ref("All");
+const selectedIds = ref(new Set());
 
 const types = ["工作", "家庭", "個人"];
 
@@ -305,6 +322,25 @@ const handleCardClick = (task) => {
   toggleDone(task);
 };
 
+const selectForDelete = (task) => {
+  if (selectedIds.value.has(task.id)) {
+    selectedIds.value.delete(task.id);
+  } else {
+    selectedIds.value.add(task.id);
+  }
+};
+
+const deleteSelected = async () => {
+  const ids = [...selectedIds.value];
+
+  for (const id of ids) {
+    await deleteTask({ id });
+  }
+
+  selectedIds.value.clear();
+  await loadData();
+};
+
 /* delete */
 const confirmDelete = (task) => {
   deleteTarget.value = task;
@@ -326,6 +362,7 @@ onMounted(loadData);
 
 <style scoped>
 .app-container {
+  min-height: 80vh;
   max-width: 700px;
   margin: auto;
   background: #111;
@@ -339,7 +376,25 @@ onMounted(loadData);
   justify-content: space-between;
   margin-bottom: 16px;
 }
+
+.quest-title-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  min-height: 40px; /*固定高度，讓quest log不會因為btn位移*/
+}
+
+.checkbox-area {
+  cursor: pointer;
+}
+.quest-content-area {
+  flex: 1;
+  font-family: "Microsoft YaHei", Arial, sans-serif;
+  cursor: grab;
+}
+
 .quest-list {
+  min-height: 500px;
   border: 3px solid white;
   padding: 5px;
 }
@@ -349,7 +404,6 @@ onMounted(loadData);
   border: 3px solid black;
   padding: 10px;
   margin-top: 6px;
-  cursor: pointer;
   transition: all 0.2s ease;
 }
 
@@ -357,11 +411,6 @@ onMounted(loadData);
   display: flex;
   align-items: center;
   gap: 12px;
-}
-
-.quest-content {
-  flex: 1;
-  font-family: "Microsoft YaHei", Arial, sans-serif;
 }
 
 .quest-main.done {
@@ -387,12 +436,14 @@ onMounted(loadData);
 
 .pixel-btn {
   background: #2ecc00;
-  border: 4px solid black;
-  padding: 12px;
+  border: 4px solid rgb(100, 100, 100);
+  padding: 4px 8px 4px 8px;
+  border-radius: 10px;
 }
 
 .delete-btn {
   margin-left: auto;
+  /* padding: 12px; */
 }
 
 /* ✅ 被抓起來 */
