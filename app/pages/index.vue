@@ -44,7 +44,7 @@
           item-key="id"
           handle=".quest-content-area"
           :delay-on-touch-only="true"
-          :delay="300"
+          :delay="1000"
           @start="handleDragStart"
           @end="handleDragEnd"
         >
