@@ -161,6 +161,8 @@ const deleteTarget = ref(null);
 const pressTimer = ref(null);
 const isLongPress = ref(false);
 
+const isDragging = ref(false);
+
 const types = ["工作", "家庭", "個人"];
 const newQuest = ref({ account: "", type: "", task: "" });
 
@@ -214,7 +216,7 @@ const loadData = async () => {
   const res = await fetchTasks();
   tasks.value = res.rows.map((obj) => ({
     ...obj,
-    done: obj.done === "1",
+    done: obj.done === "1" || obj.done === 1 || obj.done === true,
     order: Number(obj.order) || 0,
   }));
   rebuildDisplayList();
@@ -222,9 +224,34 @@ const loadData = async () => {
 
 /* click */
 const handleCardClick = (task) => {
+  if (isDragging.value) return;
   task.done = !task.done;
   rebuildDisplayList();
   updateTask({ ...task, done: task.done ? "1" : "0" });
+};
+
+const handleDragStart = () => {
+  isDragging.value = true;
+};
+
+const handleDragEnd = async () => {
+  isDragging.value = false;
+  // ✅ 1. 用畫面順序更新 order
+  displayList.value.forEach((task, index) => {
+    task.order = index;
+  });
+
+  // ✅ 2. 同步回 tasks（這步很關鍵🔥）
+  tasks.value = tasks.value.map((t) => {
+    const updated = displayList.value.find((d) => d.id === t.id);
+    return updated ? { ...t, order: updated.order } : t;
+  });
+
+  // ✅ 3. 打 API
+  await batchUpdateTasks(tasks.value);
+
+  // ✅ 4. 重新整理畫面
+  rebuildDisplayList();
 };
 
 /* select */
