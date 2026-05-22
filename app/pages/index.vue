@@ -14,6 +14,8 @@
           :items="accounts"
           label="Show"
           hide-details
+          variant="outlined"
+          class="custom-select"
         />
       </div>
 
@@ -23,13 +25,13 @@
         <div class="quest-title-row">
           <div class="quest-title-text">QUEST LOG</div>
 
-          <button
+          <v-btn
             class="pixel-btn delete-batch-btn"
             @click="deleteSelected"
             v-show="selectedIds.size"
           >
             DELETE ({{ selectedIds.size }})
-          </button>
+          </v-btn>
         </div>
 
         <!-- tabs -->
@@ -108,9 +110,19 @@
               :items="accountsNoAll"
               label="Account"
               clearable
+              class="custom-select"
             />
-            <v-select v-model="newQuest.type" :items="types" label="Type" />
-            <v-textarea v-model="newQuest.task" label="QUEST" />
+            <v-select
+              v-model="newQuest.type"
+              class="custom-select"
+              :items="types"
+              label="Type"
+            />
+            <v-textarea
+              class="custom-select"
+              v-model="newQuest.task"
+              label="QUEST"
+            />
           </v-card-text>
 
           <v-card-actions>
@@ -122,13 +134,37 @@
       </v-dialog>
 
       <!-- DELETE -->
-      <v-dialog v-model="dialog" width="300">
-        <v-card>
-          <v-card-title>DELETE TASK?</v-card-title>
-          <v-card-actions>
+      <v-dialog v-model="dialog" width="320">
+        <v-card class="custom-dialog">
+          <!-- title -->
+          <v-card-title class="dialog-title"> DELETE QUEST? </v-card-title>
+
+          <!-- subtitle -->
+          <v-card-text class="dialog-text">
+            This action cannot be undone.
+          </v-card-text>
+
+          <!-- actions -->
+          <v-card-actions class="dialog-actions">
             <v-spacer />
-            <v-btn @click="dialog = false">CANCEL</v-btn>
-            <v-btn color="red" @click="removeTask">DELETE</v-btn>
+
+            <v-btn
+              size="small"
+              class="pixel-btn-outline"
+              variant="outlined"
+              @click="dialog = false"
+            >
+              CANCEL
+            </v-btn>
+
+            <v-btn
+              size="small"
+              class="pixel-btn delete-main-btn"
+              variant="elevated"
+              @click="removeTask"
+            >
+              DELETE
+            </v-btn>
           </v-card-actions>
         </v-card>
       </v-dialog>
@@ -422,6 +458,11 @@ onMounted(loadData);
   border-radius: 10px;
 }
 
+.pixel-btn-outline {
+  padding: 6px 10px;
+  border-radius: 10px;
+}
+
 .pixel-btn:hover {
   background: #ff66a3;
 }
@@ -470,5 +511,145 @@ onMounted(loadData);
 .sortable-chosen,
 .sortable-drag {
   cursor: grab !important;
+}
+
+/* 自訂select外觀-----------------------------------------------------*/
+
+/* ✅ 主外框（你自己的） */
+.custom-select :deep(.v-field) {
+  border-radius: 12px;
+  background: #fff;
+  border: 2px solid #ffc2d1;
+  box-shadow: none;
+}
+
+/* ✅ ❌ 關掉 Vuetify 預設 outline（最關鍵🔥） */
+.custom-select :deep(.v-field__outline) {
+  display: none;
+}
+
+/* ✅ hover */
+.custom-select :deep(.v-field:hover) {
+  border-color: #ff99bb;
+  background: #fff0f5;
+}
+
+/* ✅ focus */
+.custom-select :deep(.v-field--active) {
+  border-color: #ff66a3 !important;
+  box-shadow: 0 0 6px rgba(255, 105, 135, 0.3);
+}
+
+/* ✅ 內部背景修正（避免灰色） */
+.custom-select :deep(.v-field__overlay) {
+  background: transparent;
+}
+
+/* ✅ label */
+.custom-select :deep(.v-label) {
+  color: #d63384;
+}
+
+/* ✅ icon */
+.custom-select :deep(.v-icon) {
+  color: #ff66a3;
+}
+
+/* ✅ dialog 卡片 */
+.custom-dialog {
+  border-radius: 16px;
+  border: 2px solid #ffc2d1;
+  background: #fff0f5;
+  padding: 8px;
+}
+
+/* ✅ 標題 */
+.dialog-title {
+  font-weight: bold;
+  font-size: 16px;
+  color: #d63384;
+  text-align: center;
+}
+
+/* ✅ 說明文字 */
+.dialog-text {
+  font-size: 14px;
+  color: #888;
+  text-align: left;
+  margin-top: -8px;
+}
+
+/* ✅ 按鈕區 */
+.dialog-actions {
+  margin-top: 8px;
+  gap: 8px;
+}
+.v-overlay__content {
+  transition: pop-in 0.2s ease;
+}
+
+@keyframes pop-in {
+  0% {
+    transform: scale(0.9);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+</style>
+
+<style>
+/* ✅ 下拉整體 */
+.v-overlay-container .v-list {
+  background: #fff !important;
+  border: 2px solid #ffc2d1;
+  border-radius: 12px;
+  padding: 6px;
+  box-shadow: 0 4px 12px rgba(255, 182, 193, 0.3); /* ✅ 柔粉陰影 */
+}
+
+/* ✅ 每個選項 */
+.v-overlay-container .v-list-item {
+  border-radius: 8px;
+  color: #555;
+}
+
+/* ✅ hover（重點✨） */
+.v-overlay-container .v-list-item:hover {
+  background: #fff0f5 !important;
+}
+
+/* ✅ 被選中 */
+.v-overlay-container .v-list-item--active {
+  background: #ffe4ec !important;
+}
+
+/* ✅ 移除奇怪 overlay（有些版本會有） */
+.v-overlay-container .v-overlay__content {
+  box-shadow: none !important;
+}
+
+/* ✅ optional：修正字型間距 */
+.v-overlay-container .v-list-item-title {
+  font-size: 14px;
+}
+.v-overlay-container .v-overlay__content {
+  background: transparent !important; /* ✅ 關掉灰底 */
+  box-shadow: none !important; /* ✅ 移除預設陰影 */
+  border: none !important;
+  padding: 0; /* ✅ 很關鍵 */
+}
+
+.v-overlay-container .v-select__content {
+  background: transparent !important;
+}
+
+.v-overlay-container .v-sheet {
+  background: transparent !important;
+}
+.v-overlay-container .v-sheet {
+  background: transparent !important;
 }
 </style>
