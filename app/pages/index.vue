@@ -90,6 +90,11 @@
                   </div>
                 </div>
 
+                <!-- edit -->
+                <button class="edit-btn" @click.stop="openEdit(task)">
+                  ✏️
+                </button>
+
                 <!-- delete -->
                 <button class="delete-btn" @click.stop="confirmDelete(task)">
                   ✕
@@ -133,6 +138,36 @@
         </v-card>
       </v-dialog>
 
+      <!-- EDIT DIALOG -->
+      <v-dialog v-model="dialogEdit" width="500" class="pixel-font">
+        <v-card>
+          <v-card-title>EDIT QUEST</v-card-title>
+
+          <v-card-text>
+            <!-- Type -->
+            <v-select
+              v-model="editTarget.type"
+              :items="types"
+              label="Type"
+              class="custom-select"
+            />
+
+            <!-- Content -->
+            <v-textarea
+              v-model="editTarget.task"
+              label="QUEST"
+              class="custom-select"
+            />
+          </v-card-text>
+
+          <v-card-actions>
+            <v-spacer />
+            <v-btn @click="dialogEdit = false">CANCEL</v-btn>
+            <v-btn class="pixel-btn" @click="submitEdit">SAVE</v-btn>
+          </v-card-actions>
+        </v-card>
+      </v-dialog>
+
       <!-- DELETE -->
       <v-dialog v-model="dialog" width="320">
         <v-card class="custom-dialog">
@@ -169,11 +204,23 @@
         </v-card>
       </v-dialog>
 
-      <v-snackbar v-model="snackbar">
-        {{ message }}
+      <v-snackbar v-model="snackbar" class="pixel-snackbar" location="center">
+        <div class="text-center w-100">
+          {{ message }}
+        </div>
       </v-snackbar>
     </v-container>
   </v-app>
+  <v-overlay
+    :model-value="loading"
+    class="d-flex align-center justify-center"
+    persistent
+  >
+    <div class="d-flex flex-column align-center">
+      <v-progress-circular indeterminate size="64" color="pink" />
+      <!-- <div class="mt-3 text-pink text-center w-100">Data updating...</div> -->
+    </div>
+  </v-overlay>
 </template>
 
 <script setup>
@@ -202,8 +249,51 @@ const isDragging = ref(false);
 const types = ["工作", "家庭", "個人"];
 const newQuest = ref({ account: "", type: "", task: "" });
 
-/* color */
+const snackbar = ref(false);
+const message = ref("");
+const loading = ref(false);
+const dialogEdit = ref(false);
+const editTarget = ref(null);
 
+const openEdit = (task) => {
+  editTarget.value = { ...task }; // ✅ copy，避免直接改原資料
+  dialogEdit.value = true;
+};
+
+const submitEdit = async () => {
+  await withLoading(async () => {
+    // ✅ 1. 更新本地 tasks
+    tasks.value = tasks.value.map((t) =>
+      t.id === editTarget.value.id ? { ...t, ...editTarget.value } : t
+    );
+
+    rebuildDisplayList(); // ✅ 更新畫面
+
+    // ✅ 2. 打 API
+    await updateTask({
+      ...editTarget.value,
+      done: editTarget.value.done ? "1" : "0",
+    });
+  });
+
+  dialogEdit.value = false;
+};
+
+const showMessage = (msg) => {
+  message.value = msg;
+  snackbar.value = true;
+};
+
+const withLoading = async (fn) => {
+  loading.value = true;
+  try {
+    return await fn();
+  } finally {
+    loading.value = false;
+  }
+};
+
+/* color */
 const getColor = (type) => {
   return (
     {
@@ -249,13 +339,17 @@ const rebuildDisplayList = () => {
 
 /* load */
 const loadData = async () => {
-  const res = await fetchTasks();
-  tasks.value = res.rows.map((obj) => ({
-    ...obj,
-    done: obj.done === "1" || obj.done === 1 || obj.done === true,
-    order: Number(obj.order) || 0,
-  }));
-  rebuildDisplayList();
+  showMessage("Data loading...");
+  await withLoading(async () => {
+    const res = await fetchTasks();
+    tasks.value = res.rows.map((obj) => ({
+      ...obj,
+      done: obj.done === "1" || obj.done === 1 || obj.done === true,
+      order: Number(obj.order) || 0,
+    }));
+    rebuildDisplayList();
+  });
+  snackbar.value = false;
 };
 
 /* click */
@@ -263,7 +357,11 @@ const handleCardClick = (task) => {
   if (isDragging.value) return;
   task.done = !task.done;
   rebuildDisplayList();
-  updateTask({ ...task, done: task.done ? "1" : "0" });
+  updateTask({ ...task, done: task.done ? "1" : "0" }).catch(() => {
+    // ❗ 如果失敗 rollback
+    task.done = !task.done;
+    rebuildDisplayList();
+  });
 };
 
 const handleDragStart = () => {
@@ -284,7 +382,7 @@ const handleDragEnd = async () => {
   });
 
   // ✅ 3. 打 API
-  await batchUpdateTasks(tasks.value);
+  batchUpdateTasks(tasks.value).catch(console.error);
 
   // ✅ 4. 重新整理畫面
   rebuildDisplayList();
@@ -301,11 +399,15 @@ const selectForDelete = (task) => {
 
 /* delete */
 const deleteSelected = async () => {
-  for (const id of selectedIds.value) {
-    await deleteTask({ id });
-  }
+  const ids = new Set(selectedIds.value);
+
+  // ✅ 1. 先刪畫面
+  tasks.value = tasks.value.filter((t) => !ids.has(t.id));
+  rebuildDisplayList();
   selectedIds.value.clear();
-  await loadData();
+
+  // ✅ 2. 平行打 API（更快🔥）
+  await Promise.all([...ids].map((id) => deleteTask({ id })));
 };
 
 const confirmDelete = (task) => {
@@ -314,21 +416,31 @@ const confirmDelete = (task) => {
 };
 
 const removeTask = async () => {
-  await deleteTask({ id: deleteTarget.value.id });
+  const id = deleteTarget.value.id;
+
+  // ✅ 1. 先刪畫面
+  tasks.value = tasks.value.filter((t) => t.id !== id);
+  rebuildDisplayList();
+
   dialog.value = false;
-  await loadData();
+
+  // ✅ 2. 打 API
+  await deleteTask({ id });
 };
 
 const submitQuest = async () => {
-  await addTask({
+  const newTask = {
     id: Date.now().toString(),
     ...newQuest.value,
-    done: "0",
+    done: false,
     date: new Date().toISOString(),
     order: tasks.value.length,
-  });
+  };
+
+  tasks.value.push(newTask);
+  rebuildDisplayList();
   dialogAdd.value = false;
-  await loadData();
+  await addTask(newTask);
 };
 
 const formatDate = (d) => new Date(d).toLocaleDateString();
@@ -440,8 +552,8 @@ onMounted(loadData);
 .delete-btn {
   background: #ff4d88;
   color: white;
-  border: none;
-  padding: 6px 10px;
+  border: 2px solid #ff6699;
+  padding: 4px 8px;
   border-radius: 8px;
 }
 
@@ -459,6 +571,8 @@ onMounted(loadData);
 }
 
 .pixel-btn-outline {
+  color: #7a7a7a;
+  border-color: #b8b8b8;
   padding: 6px 10px;
   border-radius: 10px;
 }
@@ -588,6 +702,18 @@ onMounted(loadData);
   transition: pop-in 0.2s ease;
 }
 
+.edit-btn {
+  background: #ffddb0;
+  color: white;
+  border: 2px solid #f3be9b;
+  padding: 5px 5px;
+  border-radius: 8px;
+}
+
+.edit-btn:hover {
+  background: #ffb84d;
+}
+
 @keyframes pop-in {
   0% {
     transform: scale(0.9);
@@ -651,5 +777,15 @@ onMounted(loadData);
 }
 .v-overlay-container .v-sheet {
   background: transparent !important;
+}
+
+.v-snackbar__wrapper > .v-snackbar__content {
+  background: #fdd9e5; /* 淡粉底 */
+  border: 2px solid #ff99bb;
+  border-radius: 12px;
+  color: #d81c7a;
+  font-weight: bold;
+  box-shadow: 0 4px 12px rgba(255, 182, 193, 0.4);
+  margin-top: 15vh;
 }
 </style>

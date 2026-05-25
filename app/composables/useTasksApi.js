@@ -1,6 +1,6 @@
 export const useTasksApi = () => {
   const API_URL =
-    "https://script.google.com/macros/s/AKfycbz0x7NwLAIPIq2Wl-WcrYVNGhP1MD6VIJID0XAdg3EGDZNYmQIQevXQR2m6EXU9TsZYdA/exec";
+    "https://script.google.com/macros/s/AKfycbxMIHA4QDCLWp9iysAhENkuM2QiRhflcF0xECaaCVxHZPFxdLdGZaSEXlDCEsIzlfHTLQ/exec";
 
   /* ✅ GET（不用改） */
   const fetchTasks = async () => {
